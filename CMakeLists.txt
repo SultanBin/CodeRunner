@@ -23,6 +23,10 @@ set(SOURCES
     src/filemanager.cpp
     src/compiler.cpp
     src/debugger.cpp
+    src/compileroutputpanel.cpp
+    src/errorparser.cpp
+    src/projectconfig.cpp
+    src/compilersettingsdialog.cpp
 )
 
 # Header files
@@ -32,6 +36,10 @@ set(HEADERS
     src/filemanager.h
     src/compiler.h
     src/debugger.h
+    src/compileroutputpanel.h
+    src/errorparser.h
+    src/projectconfig.h
+    src/compilersettingsdialog.h
 )
 
 # Resource files
