@@ -1,0 +1,49 @@
+# Build directories
+build/
+build-*/
+cmake-build-*/
+
+# CMake files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Qt/MOC files
+*.moc
+moc_*.cpp
+moc_*.h
+ui_*.h
+*.qm
+.qmake.stash
+
+# Compiled objects and libraries
+*.o
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+
+# IDE files
+.vscode/
+.idea/
+*.pro.user
+*.creator
+*.creator.user
+*.cbp
+.DS_Store
+
+# Test binaries
+test_*
+
+# Project files
+.coderunner/
+.coderunner
+*.coderunner
+
+# Output
+bin/
+obj/
+*.out
