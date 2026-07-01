@@ -27,6 +27,11 @@ set(SOURCES
     src/errorparser.cpp
     src/projectconfig.cpp
     src/compilersettingsdialog.cpp
+    src/miparser.cpp
+    src/breakpointpanel.cpp
+    src/variablespanel.cpp
+    src/callstackpanel.cpp
+    src/debugconsole.cpp
 )
 
 # Header files
@@ -40,6 +45,12 @@ set(HEADERS
     src/errorparser.h
     src/projectconfig.h
     src/compilersettingsdialog.h
+    src/miparser.h
+    src/breakpointpanel.h
+    src/variablespanel.h
+    src/callstackpanel.h
+    src/debugconsole.h
+    src/debugger_structs.h
 )
 
 # Resource files
