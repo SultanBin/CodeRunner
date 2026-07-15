@@ -467,21 +467,56 @@ void MainWindow::openFile()
         codeEditor->openFile(file);
     }
 }
-void MainWindow::saveFile() { qDebug() << "Save File"; }
-void MainWindow::saveFileAs() { qDebug() << "Save As"; }
-void MainWindow::saveAll() { qDebug() << "Save All"; }
-void MainWindow::closeFile() { qDebug() << "Close File"; }
+void MainWindow::saveFile()
+{
+    if (currentFilePath.isEmpty()) {
+        saveFileAs();
+        return;
+    }
+    codeEditor->saveFile(currentFilePath);
+}
+
+void MainWindow::saveFileAs()
+{
+    QString file = QFileDialog::getSaveFileName(this, tr("Save File As"),
+        currentFilePath.isEmpty() ? currentProjectPath : currentFilePath,
+        tr("C++ Files (*.cpp *.cxx *.cc);;C Files (*.c);;Header Files (*.h *.hpp);;All Files (*)"));
+    if (!file.isEmpty()) {
+        currentFilePath = file;
+        codeEditor->saveFile(currentFilePath);
+    }
+}
+
+void MainWindow::saveAll()
+{
+    saveFile();
+}
+
+void MainWindow::closeFile()
+{
+    if (codeEditor->isModified()) {
+        auto result = QMessageBox::question(this, tr("Unsaved Changes"),
+            tr("Save changes before closing?"),
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+        if (result == QMessageBox::Save)
+            saveFile();
+        else if (result == QMessageBox::Cancel)
+            return;
+    }
+    codeEditor->clear();
+    currentFilePath.clear();
+}
 void MainWindow::exit() { close(); }
 
 // Edit menu slots
-void MainWindow::undo() { qDebug() << "Undo"; }
-void MainWindow::redo() { qDebug() << "Redo"; }
-void MainWindow::cut() { qDebug() << "Cut"; }
-void MainWindow::copy() { qDebug() << "Copy"; }
-void MainWindow::paste() { qDebug() << "Paste"; }
-void MainWindow::selectAll() { qDebug() << "Select All"; }
-void MainWindow::find() { qDebug() << "Find"; }
-void MainWindow::replace() { qDebug() << "Replace"; }
+void MainWindow::undo() { codeEditor->undo(); }
+void MainWindow::redo() { codeEditor->redo(); }
+void MainWindow::cut() { codeEditor->cut(); }
+void MainWindow::copy() { codeEditor->copy(); }
+void MainWindow::paste() { codeEditor->paste(); }
+void MainWindow::selectAll() { codeEditor->selectAll(); }
+void MainWindow::find() { qDebug() << "Find — not yet implemented"; }
+void MainWindow::replace() { qDebug() << "Replace — not yet implemented"; }
 
 // Build menu slots
 void MainWindow::compile()
