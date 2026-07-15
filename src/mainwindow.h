@@ -8,6 +8,7 @@
 #include <QLabel>
 #include <QProgressBar>
 #include <memory>
+#include <QProcess>
 
 class CodeEditor;
 class FileManager;
@@ -76,6 +77,17 @@ private slots:
     void onFileSelected(const QString &filepath);
     void onFileModified(bool modified);
 
+    // New slots for compiler output handling
+    void onCompilationStarted();
+    void onCompilationOutput(const QString &output);
+    void onCompilationWarning(const QString &warning);
+    void onCompilationError(const QString &error);
+
+    // Run process output
+    void onRunProcessOutput();
+    void onRunProcessError();
+    void onRunProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
+
 private:
     void createUI();
     void createMenuBar();
@@ -110,9 +122,12 @@ private:
     // State
     QString currentProjectPath;
     QString currentFilePath;
+    QString lastBuildOutputPath;
     bool isModified;
     bool isCompiling;
     bool isDebugging;
+    bool runAfterCompile;
+    std::unique_ptr<QProcess> runProcess;
 };
 
 #endif // MAINWINDOW_H
