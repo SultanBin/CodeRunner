@@ -15,6 +15,10 @@ class FileManager;
 class Compiler;
 class Debugger;
 class CompilerOutputPanel;
+class BreakpointPanel;
+class VariablesPanel;
+class CallStackPanel;
+class DebugConsole;
 
 class MainWindow : public QMainWindow
 {
@@ -113,10 +117,15 @@ private:
     std::unique_ptr<Compiler> compiler;
     std::unique_ptr<Debugger> debugger;
     
+    // Debug panels
+    std::unique_ptr<BreakpointPanel> breakpointPanel;
+    std::unique_ptr<VariablesPanel> variablesPanel;
+    std::unique_ptr<CallStackPanel> callstackPanel;
+    std::unique_ptr<DebugConsole> debugConsoleWidget;
+
     // Output console replaced with CompilerOutputPanel
     std::unique_ptr<CompilerOutputPanel> compilerPanel;
-    QPlainTextEdit *debugConsole;
-    
+
     // Status bar
     QLabel *statusLabel;
     QLabel *cursorPosLabel;
