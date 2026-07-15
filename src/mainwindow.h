@@ -14,6 +14,7 @@ class CodeEditor;
 class FileManager;
 class Compiler;
 class Debugger;
+class CompilerOutputPanel;
 
 class MainWindow : public QMainWindow
 {
@@ -88,6 +89,9 @@ private slots:
     void onRunProcessError();
     void onRunProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
 
+    // Error navigation
+    void openFileAt(const QString &file, int line, int column);
+
 private:
     void createUI();
     void createMenuBar();
@@ -109,8 +113,8 @@ private:
     std::unique_ptr<Compiler> compiler;
     std::unique_ptr<Debugger> debugger;
     
-    // Output console
-    QPlainTextEdit *outputConsole;
+    // Output console replaced with CompilerOutputPanel
+    std::unique_ptr<CompilerOutputPanel> compilerPanel;
     QPlainTextEdit *debugConsole;
     
     // Status bar
