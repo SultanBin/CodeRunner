@@ -4,6 +4,10 @@
 #include <QStandardPaths>
 #include <QCoreApplication>
 #include <QSysInfo>
+#include <QFileInfo>
+#include <QDir>
+#include <QDirIterator>
+#include "projectconfig.h"
 
 Compiler::Compiler(QObject *parent)
     : QObject(parent), activeCompiler(CompilerType::GCC), optimizationLevel("-O2")
@@ -54,8 +58,129 @@ void Compiler::compileFile(const QString &sourceFile, const QString &outputFile)
 
 void Compiler::compileProject(const QString &projectPath)
 {
-    // TODO: Implement project-level compilation
-    qDebug() << "Compiling project:" << projectPath;
+    if (process->state() == QProcess::Running) {
+        qWarning() << "Compilation already in progress";
+        return;
+    }
+
+    compilationOutput.clear();
+
+    // Load project config
+    ProjectConfig cfg;
+    QFileInfo pathInfo(projectPath);
+    QString configFile;
+    if (pathInfo.isDir()) {
+        // Look for common project config names
+        QStringList candidates = {"project.json", "project.conf", "coderunner.json", "projectconfig.json"};
+        for (const QString &name : candidates) {
+            QString candidate = QDir(projectPath).filePath(name);
+            if (QFileInfo::exists(candidate)) {
+                configFile = candidate;
+                break;
+            }
+        }
+        if (!configFile.isEmpty()) {
+            if (!cfg.load(configFile)) {
+                qWarning() << "Failed to load project config from" << configFile;
+                // continue with defaults
+            }
+        } else {
+            // No config found: set defaults with projectPath
+            cfg.setProjectPath(projectPath);
+            cfg.setProjectName(QFileInfo(projectPath).fileName());
+        }
+    } else if (pathInfo.isFile()) {
+        // If given a file, try to load it as config
+        if (!cfg.load(projectPath)) {
+            qWarning() << "Failed to load project config from" << projectPath;
+            // Fallback: treat parent dir as project
+            cfg.setProjectPath(pathInfo.absolutePath());
+            cfg.setProjectName(pathInfo.baseName());
+        }
+    } else {
+        // Path doesn't exist; error out
+        emit compilationError("Project path does not exist: " + projectPath);
+        emit compilationFinished(false, compilationOutput);
+        return;
+    }
+
+    // Resolve directories
+    QString basePath = cfg.getProjectPath().isEmpty() ? projectPath : cfg.getProjectPath();
+    QDir baseDir(basePath);
+    QString sourceDir = baseDir.filePath(cfg.getSourceDir());
+    QString buildDir = baseDir.filePath(cfg.getBuildDir());
+    QString binDir = baseDir.filePath(cfg.getBinDir());
+
+    // Collect source files
+    QStringList sources;
+    QDirIterator it(sourceDir, QStringList() << "*.cpp" << "*.cc" << "*.cxx" << "*.c",
+                    QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        sources << it.next();
+    }
+
+    if (sources.isEmpty()) {
+        emit compilationError("No source files found in " + sourceDir);
+        emit compilationFinished(false, compilationOutput);
+        return;
+    }
+
+    // Ensure build/bin directories exist
+    QDir().mkpath(buildDir);
+    QDir().mkpath(binDir);
+
+    // Output file
+    QString outputFile = QDir(binDir).filePath(cfg.getProjectName());
+#ifdef Q_OS_WIN
+    outputFile += ".exe";
+#endif
+
+    // Build arguments
+    QStringList arguments;
+    for (const QString &s : sources) arguments << s;
+
+    arguments << "-o" << outputFile;
+
+    // Optimization and standard
+    if (!cfg.getOptimization().isEmpty()) arguments << cfg.getOptimization();
+    if (!cfg.getStandard().isEmpty()) arguments << ("-std=" + cfg.getStandard());
+
+    // Custom flags
+    if (!cfg.getCustomFlags().isEmpty()) {
+        QStringList custom = cfg.getCustomFlags().split(' ', Qt::SkipEmptyParts);
+        arguments << custom;
+    }
+
+    // Include paths
+    for (const QString &inc : cfg.getIncludePaths()) {
+        arguments << ("-I" + inc);
+    }
+
+    // Library paths and libs
+    for (const QString &libPath : cfg.getLibraryPaths()) {
+        arguments << ("-L" + libPath);
+    }
+    for (const QString &lib : cfg.getLibraries()) {
+        arguments << ("-l" + lib);
+    }
+
+    // Merge in any configured global include/library paths for this Compiler instance
+    for (const QString &inc : includePaths) arguments << ("-I" + inc);
+    for (const QString &libPath : libraryPaths) arguments << ("-L" + libPath);
+    if (!compilerFlags.isEmpty()) {
+        arguments << compilerFlags.split(' ', Qt::SkipEmptyParts);
+    }
+
+    QString compilerPath = getCompilerPath();
+    if (compilerPath.isEmpty()) {
+        emit compilationError("Compiler not found");
+        emit compilationFinished(false, compilationOutput);
+        return;
+    }
+
+    qDebug() << "Compiling project with:" << compilerPath << arguments;
+    emit compilationStarted();
+    process->start(compilerPath, arguments);
 }
 
 void Compiler::stop()

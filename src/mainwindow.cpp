@@ -3,6 +3,8 @@
 #include "filemanager.h"
 #include "compiler.h"
 #include "debugger.h"
+#include "compileroutputpanel.h"
+#include "compiler_output_feeder.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -22,9 +24,14 @@
 #include <QDragEnterEvent>
 #include <QMimeData>
 #include <QDebug>
+#include <QProcess>
+#include <QFileInfo>
+#include <QDir>
+
+#include "projectconfig.h"
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), isModified(false), isCompiling(false), isDebugging(false)
+    : QMainWindow(parent), isModified(false), isCompiling(false), isDebugging(false), runAfterCompile(false)
 {
     setWindowTitle("CodeRunner - C/C++ IDE");
     setWindowIcon(QIcon(":/icons/app.png"));
@@ -34,6 +41,8 @@ MainWindow::MainWindow(QWidget *parent)
     codeEditor = std::make_unique<CodeEditor>();
     compiler = std::make_unique<Compiler>();
     debugger = std::make_unique<Debugger>();
+    runProcess = nullptr;
+    compilerPanel = std::make_unique<CompilerOutputPanel>();
     
     // Setup UI
     createUI();
@@ -86,13 +95,10 @@ void MainWindow::createUI()
     QVBoxLayout *consoleLayout = new QVBoxLayout(consoleWidget);
     consoleLayout->setContentsMargins(0, 0, 0, 0);
     
-    // Output console
-    outputConsole = new QPlainTextEdit();
-    outputConsole->setPlaceholderText("Build output will appear here...");
-    outputConsole->setReadOnly(true);
-    outputConsole->setMaximumHeight(150);
-    
-    consoleLayout->addWidget(outputConsole);
+    // Output console -> CompilerOutputPanel
+    compilerPanel->setPlaceholderText("Build output will appear here...");
+    compilerPanel->setMaximumHeight(200);
+    consoleLayout->addWidget(compilerPanel.get());
     rightSplitter->addWidget(consoleWidget);
     
     // Set splitter sizes (70% editor, 30% console)
@@ -379,10 +385,20 @@ void MainWindow::setupConnections()
     // Connect compiler signals
     connect(compiler.get(), QOverload<bool, const QString &>::of(&Compiler::compilationFinished),
             this, &MainWindow::onCompileFinished);
+    connect(compiler.get(), &Compiler::compilationStarted, this, &MainWindow::onCompilationStarted);
+    connect(compiler.get(), &Compiler::outputReceived, this, &MainWindow::onCompilationOutput);
+    connect(compiler.get(), &Compiler::compilationWarning, this, &MainWindow::onCompilationWarning);
+    connect(compiler.get(), &Compiler::compilationError, this, &MainWindow::onCompilationError);
     
     // Connect file manager signals
     connect(fileManager.get(), &FileManager::fileSelected,
             this, &MainWindow::onFileSelected);
+    connect(fileManager.get(), &FileManager::fileDoubleClicked,
+            this, &MainWindow::openFileAt);
+    
+    // Connect compiler panel error click
+    connect(compilerPanel.get(), &CompilerOutputPanel::errorClicked,
+            this, &MainWindow::openFileAt);
     
     // Connect editor signals
     connect(codeEditor.get(), &CodeEditor::modificationChanged,
@@ -432,8 +448,25 @@ void MainWindow::dropEvent(QDropEvent *event)
 // File menu slots
 void MainWindow::newProject() { qDebug() << "New Project"; }
 void MainWindow::newFile() { qDebug() << "New File"; }
-void MainWindow::openProject() { qDebug() << "Open Project"; }
-void MainWindow::openFile() { qDebug() << "Open File"; }
+void MainWindow::openProject()
+{
+    QString dir = QFileDialog::getExistingDirectory(this, tr("Open Project"));
+    if (!dir.isEmpty()) {
+        currentProjectPath = dir;
+        fileManager->openProject(dir);
+        statusLabel->setText(tr("Project: %1").arg(QFileInfo(dir).fileName()));
+    }
+}
+void MainWindow::openFile()
+{
+    QString file = QFileDialog::getOpenFileName(this, tr("Open File"));
+    if (!file.isEmpty()) {
+        currentFilePath = file;
+        // Ask file manager to open/select
+        fileManager->openProject(QFileInfo(file).absolutePath());
+        codeEditor->openFile(file);
+    }
+}
 void MainWindow::saveFile() { qDebug() << "Save File"; }
 void MainWindow::saveFileAs() { qDebug() << "Save As"; }
 void MainWindow::saveAll() { qDebug() << "Save All"; }
@@ -451,9 +484,81 @@ void MainWindow::find() { qDebug() << "Find"; }
 void MainWindow::replace() { qDebug() << "Replace"; }
 
 // Build menu slots
-void MainWindow::compile() { qDebug() << "Compile"; }
-void MainWindow::compileAndRun() { qDebug() << "Compile & Run"; }
-void MainWindow::stop() { qDebug() << "Stop"; }
+void MainWindow::compile()
+{
+    // Clear console
+    compilerPanel->clear();
+    runAfterCompile = false;
+
+    if (!currentProjectPath.isEmpty()) {
+        // compile project
+        // compute expected output and store
+        ProjectConfig cfg;
+        QString configFile;
+        QFileInfo pinfo(currentProjectPath);
+        if (pinfo.isDir()) {
+            QStringList candidates = {"project.json", "project.conf", "coderunner.json", "projectconfig.json"};
+            for (const QString &name : candidates) {
+                QString candidate = QDir(currentProjectPath).filePath(name);
+                if (QFileInfo::exists(candidate)) { configFile = candidate; break; }
+            }
+            if (!configFile.isEmpty()) cfg.load(configFile);
+            else { cfg.setProjectPath(currentProjectPath); cfg.setProjectName(pinfo.fileName()); }
+        } else {
+            // not a dir, maybe a file
+            cfg.setProjectPath(pinfo.absolutePath()); cfg.setProjectName(pinfo.baseName());
+        }
+        QString binPath = QDir(cfg.getProjectPath()).filePath(cfg.getBinDir());
+        QDir().mkpath(binPath);
+        QString out = QDir(binPath).filePath(cfg.getProjectName());
+#ifdef Q_OS_WIN
+        out += ".exe";
+#endif
+        lastBuildOutputPath = out;
+        compilationStatusLabel->setText(tr("Building project..."));
+        isCompiling = true;
+        compiler->compileProject(currentProjectPath);
+    } else if (!currentFilePath.isEmpty()) {
+        // compile single file
+        QFileInfo fi(currentFilePath);
+        QString outDir = fi.absolutePath();
+        QString out = QDir(outDir).filePath(fi.completeBaseName());
+#ifdef Q_OS_WIN
+        out += ".exe";
+#endif
+        lastBuildOutputPath = out;
+        compilationStatusLabel->setText(tr("Building file..."));
+        isCompiling = true;
+        compiler->compileFile(currentFilePath, lastBuildOutputPath);
+    } else {
+        QMessageBox::information(this, tr("Build"), tr("No project or file selected to build."));
+    }
+}
+
+void MainWindow::compileAndRun()
+{
+    runAfterCompile = true;
+    compile();
+}
+
+void MainWindow::stop()
+{
+    // Stop compilation or running process
+    if (isCompiling) {
+        compiler->stop();
+        isCompiling = false;
+        compilationStatusLabel->setText(tr("Stopped"));
+    }
+
+    if (runProcess && runProcess->state() == QProcess::Running) {
+        runProcess->terminate();
+        if (!runProcess->waitForFinished(2000)) {
+            runProcess->kill();
+            runProcess->waitForFinished();
+        }
+        compilationStatusLabel->setText(tr("Run stopped"));
+    }
+}
 
 // Debug menu slots
 void MainWindow::startDebug() { qDebug() << "Start Debug"; }
@@ -484,10 +589,58 @@ void MainWindow::aboutQt()
 
 void MainWindow::documentation() { qDebug() << "Documentation"; }
 
-// Signal handlers
+// New compilation/run signal handlers
+void MainWindow::onCompilationStarted()
+{
+    compilationProgress->setVisible(true);
+    compilationProgress->setRange(0, 0); // marquee
+    compilationStatusLabel->setText(tr("Compiling..."));
+}
+
+void MainWindow::onCompilationOutput(const QString &output)
+{
+    // Feed incremental output into the parser/panel
+    feedOutputToPanel(compilerPanel.get(), output);
+}
+
+void MainWindow::onCompilationWarning(const QString &warning)
+{
+    feedOutputToPanel(compilerPanel.get(), warning);
+}
+
+void MainWindow::onCompilationError(const QString &error)
+{
+    feedOutputToPanel(compilerPanel.get(), error);
+}
+
+void MainWindow::onRunProcessOutput()
+{
+    if (!runProcess) return;
+    QString out = QString::fromUtf8(runProcess->readAllStandardOutput());
+    compilerPanel->addOutput(out);
+}
+
+void MainWindow::onRunProcessError()
+{
+    if (!runProcess) return;
+    QString err = QString::fromUtf8(runProcess->readAllStandardError());
+    compilerPanel->addOutput(err);
+}
+
+void MainWindow::onRunProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    Q_UNUSED(exitStatus);
+    QString msg = tr("Program exited with code %1").arg(exitCode);
+    compilerPanel->addOutput(msg);
+    compilationStatusLabel->setText(tr("Run finished"));
+    runAfterCompile = false;
+}
+
 void MainWindow::onCompileFinished(bool success, const QString &output)
 {
-    outputConsole->setPlainText(output);
+    // Final output: ensure full capture
+    feedOutputToPanel(compilerPanel.get(), output);
+    compilationProgress->setVisible(false);
     if (success) {
         statusLabel->setText(tr("Compilation successful"));
         compilationStatusLabel->setText(tr("✓ Success"));
@@ -495,6 +648,51 @@ void MainWindow::onCompileFinished(bool success, const QString &output)
         statusLabel->setText(tr("Compilation failed"));
         compilationStatusLabel->setText(tr("✗ Failed"));
     }
+
+    isCompiling = false;
+
+    // If requested, run the produced binary
+    if (success && runAfterCompile && !lastBuildOutputPath.isEmpty()) {
+        runProcess = std::make_unique<QProcess>(this);
+        connect(runProcess.get(), &QProcess::readyReadStandardOutput, this, &MainWindow::onRunProcessOutput);
+        connect(runProcess.get(), &QProcess::readyReadStandardError, this, &MainWindow::onRunProcessError);
+        connect(runProcess.get(), QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+                this, &MainWindow::onRunProcessFinished);
+
+        compilationStatusLabel->setText(tr("Running..."));
+        runProcess->start(lastBuildOutputPath);
+        if (!runProcess->waitForStarted(1000)) {
+            compilerPanel->addOutput(tr("Failed to start program: %1").arg(lastBuildOutputPath));
+            runAfterCompile = false;
+        }
+    }
+}
+
+void MainWindow::openFileAt(const QString &file, int line, int column)
+{
+    QString path = file;
+    if (path.isEmpty()) return;
+
+    // If path is relative, resolve against project
+    QFileInfo fi(path);
+    if (!fi.isAbsolute() && !currentProjectPath.isEmpty()) {
+        path = QDir(currentProjectPath).filePath(path);
+        fi = QFileInfo(path);
+    }
+
+    if (!fi.exists()) {
+        compilerPanel->addOutput(tr("Cannot open file: %1").arg(path));
+        return;
+    }
+
+    // Ensure project tree is aware of the project
+    fileManager->openProject(fi.absolutePath());
+    codeEditor->openFile(path);
+    codeEditor->gotoLine(line);
+    codeEditor->setFocus();
+
+    QString msg = tr("Opened %1 at line %2").arg(fi.fileName()).arg(line);
+    statusLabel->setText(msg);
 }
 
 void MainWindow::onFileSelected(const QString &filepath)

@@ -8,11 +8,17 @@
 #include <QLabel>
 #include <QProgressBar>
 #include <memory>
+#include <QProcess>
 
 class CodeEditor;
 class FileManager;
 class Compiler;
 class Debugger;
+class CompilerOutputPanel;
+class BreakpointPanel;
+class VariablesPanel;
+class CallStackPanel;
+class DebugConsole;
 
 class MainWindow : public QMainWindow
 {
@@ -76,6 +82,20 @@ private slots:
     void onFileSelected(const QString &filepath);
     void onFileModified(bool modified);
 
+    // New slots for compiler output handling
+    void onCompilationStarted();
+    void onCompilationOutput(const QString &output);
+    void onCompilationWarning(const QString &warning);
+    void onCompilationError(const QString &error);
+
+    // Run process output
+    void onRunProcessOutput();
+    void onRunProcessError();
+    void onRunProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
+
+    // Error navigation
+    void openFileAt(const QString &file, int line, int column);
+
 private:
     void createUI();
     void createMenuBar();
@@ -97,10 +117,15 @@ private:
     std::unique_ptr<Compiler> compiler;
     std::unique_ptr<Debugger> debugger;
     
-    // Output console
-    QPlainTextEdit *outputConsole;
-    QPlainTextEdit *debugConsole;
-    
+    // Debug panels
+    std::unique_ptr<BreakpointPanel> breakpointPanel;
+    std::unique_ptr<VariablesPanel> variablesPanel;
+    std::unique_ptr<CallStackPanel> callstackPanel;
+    std::unique_ptr<DebugConsole> debugConsoleWidget;
+
+    // Output console replaced with CompilerOutputPanel
+    std::unique_ptr<CompilerOutputPanel> compilerPanel;
+
     // Status bar
     QLabel *statusLabel;
     QLabel *cursorPosLabel;
@@ -110,9 +135,12 @@ private:
     // State
     QString currentProjectPath;
     QString currentFilePath;
+    QString lastBuildOutputPath;
     bool isModified;
     bool isCompiling;
     bool isDebugging;
+    bool runAfterCompile;
+    std::unique_ptr<QProcess> runProcess;
 };
 
 #endif // MAINWINDOW_H
