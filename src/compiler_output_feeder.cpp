@@ -3,16 +3,30 @@
 #include <QRegularExpression>
 #include <QFileInfo>
 
-// Helper: feed compiler output through ErrorParser, populate CompilerOutputPanel with structured errors
-void feedOutputToPanel(CompilerOutputPanel *panel, const QString &output)
+// Incremental feeder: buffer partial chunks until newline, avoid clearing panel
+static QString g_compiler_output_buffer;
+
+void feedOutputToPanel(CompilerOutputPanel *panel, const QString &chunk)
 {
     if (!panel) return;
 
     ErrorParser parser;
-    panel->clear();
 
-    // Split output into lines and parse
-    QStringList lines = output.split('\n');
+    // Append incoming chunk to buffer
+    g_compiler_output_buffer += chunk;
+    // Normalize CRLF
+    g_compiler_output_buffer.replace("\r\n", "\n");
+
+    int lastNewline = g_compiler_output_buffer.lastIndexOf('\n');
+    if (lastNewline == -1) {
+        // No complete lines yet
+        return;
+    }
+
+    QString toParse = g_compiler_output_buffer.left(lastNewline + 1);
+    g_compiler_output_buffer = g_compiler_output_buffer.mid(lastNewline + 1);
+
+    QStringList lines = toParse.split('\n', Qt::SkipEmptyParts);
     for (const QString &line : lines) {
         if (line.trimmed().isEmpty()) continue;
         QVector<ParsedError> parsed = parser.parseOutput(line);
