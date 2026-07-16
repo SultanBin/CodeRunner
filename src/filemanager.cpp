@@ -124,8 +124,15 @@ void FileManager::createNewFolder(const QString &foldername, const QString &pare
 void FileManager::renameItem(QTreeWidgetItem *item, const QString &newName)
 {
     QString oldPath = getSelectedFilePath();
-    item->setText(0, newName);
-    // TODO: Implement actual rename on disk
+    QFileInfo info(oldPath);
+    QString newPath = info.absolutePath() + "/" + newName;
+
+    if (QFile::rename(oldPath, newPath)) {
+        item->setText(0, newName);
+        emit fileRenamed(oldPath, newPath);
+    } else {
+        qWarning() << "Failed to rename" << oldPath << "to" << newPath;
+    }
 }
 
 void FileManager::deleteItem(QTreeWidgetItem *item)

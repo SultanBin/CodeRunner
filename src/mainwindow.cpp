@@ -29,6 +29,8 @@
 #include <QDir>
 
 #include "projectconfig.h"
+#include "compilersettingsdialog.h"
+#include <QInputDialog>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), isModified(false), isCompiling(false), isDebugging(false), runAfterCompile(false)
@@ -446,8 +448,55 @@ void MainWindow::dropEvent(QDropEvent *event)
 }
 
 // File menu slots
-void MainWindow::newProject() { qDebug() << "New Project"; }
-void MainWindow::newFile() { qDebug() << "New File"; }
+void MainWindow::newProject()
+{
+    QString dir = QFileDialog::getExistingDirectory(this, tr("New Project Location"));
+    if (dir.isEmpty()) return;
+
+    QString name = QInputDialog::getText(this, tr("New Project"), tr("Project name:"));
+    if (name.isEmpty()) return;
+
+    fileManager->createNewProject(name, dir);
+    currentProjectPath = dir + "/" + name;
+    statusLabel->setText(tr("Project: %1").arg(name));
+}
+
+void MainWindow::newFile()
+{
+    QString defaultDir = currentProjectPath.isEmpty()
+        ? QDir::homePath()
+        : currentProjectPath;
+
+    QString file = QFileDialog::getSaveFileName(this, tr("New File"), defaultDir,
+        tr("C++ Files (*.cpp *.cxx *.cc);;C Files (*.c);;Header Files (*.h *.hpp);;All Files (*)"));
+    if (file.isEmpty()) return;
+
+    // Write starter template based on extension
+    QFile f(file);
+    if (f.open(QFile::WriteOnly | QFile::Text)) {
+        QString ext = QFileInfo(file).suffix().toLower();
+        if (ext == "c") {
+            f.write("#include <stdio.h>\n\nint main()\n{\n    \n    return 0;\n}\n");
+        } else if (ext == "cpp" || ext == "cxx" || ext == "cc") {
+            f.write("#include <iostream>\n\nusing namespace std;\n\nint main()\n{\n    \n    return 0;\n}\n");
+        } else if (ext == "h" || ext == "hpp") {
+            QString guard = QFileInfo(file).baseName().toUpper() + "_H";
+            f.write(QString("#ifndef %1\n#define %1\n\n\n\n#endif // %1\n").arg(guard).toUtf8());
+        }
+        f.close();
+    }
+
+    currentFilePath = file;
+    codeEditor->openFile(file);
+
+    // If no project open, treat the file's directory as the project
+    if (currentProjectPath.isEmpty()) {
+        currentProjectPath = QFileInfo(file).absolutePath();
+        fileManager->openProject(currentProjectPath);
+    } else {
+        fileManager->openProject(currentProjectPath);
+    }
+}
 void MainWindow::openProject()
 {
     QString dir = QFileDialog::getExistingDirectory(this, tr("Open Project"));
@@ -605,7 +654,32 @@ void MainWindow::continueExecution() { qDebug() << "Continue"; }
 
 // Tools menu slots
 void MainWindow::preferences() { qDebug() << "Preferences"; }
-void MainWindow::manageCompilers() { qDebug() << "Manage Compilers"; }
+void MainWindow::manageCompilers()
+{
+    ProjectConfig cfg;
+    QString configFile;
+    if (!currentProjectPath.isEmpty()) {
+        QStringList candidates = {"project.json", "coderunner.json", "projectconfig.json"};
+        for (const QString &name : candidates) {
+            QString candidate = QDir(currentProjectPath).filePath(name);
+            if (QFileInfo::exists(candidate)) { configFile = candidate; break; }
+        }
+        if (!configFile.isEmpty()) cfg.load(configFile);
+        else { cfg.setProjectPath(currentProjectPath); }
+    }
+
+    CompilerSettingsDialog dialog(cfg, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        ProjectConfig updated = dialog.getConfig();
+        if (!currentProjectPath.isEmpty()) {
+            QString savePath = configFile.isEmpty()
+                ? QDir(currentProjectPath).filePath("coderunner.json")
+                : configFile;
+            updated.save(savePath);
+            statusLabel->setText(tr("Compiler settings saved"));
+        }
+    }
+}
 
 // Help menu slots
 void MainWindow::about()

@@ -1,0 +1,81 @@
+/* CodeRunner Light Theme */
+QMainWindow, QWidget {
+    background-color: #ffffff;
+    color: #1e1e1e;
+}
+
+QMenuBar {
+    background-color: #f3f3f3;
+    color: #1e1e1e;
+}
+
+QMenuBar::item:selected {
+    background-color: #c4e1ff;
+}
+
+QMenu {
+    background-color: #f3f3f3;
+    color: #1e1e1e;
+    border: 1px solid #cccccc;
+}
+
+QMenu::item:selected {
+    background-color: #c4e1ff;
+}
+
+QToolBar {
+    background-color: #f3f3f3;
+    border: none;
+    spacing: 4px;
+}
+
+QTreeWidget {
+    background-color: #f3f3f3;
+    color: #1e1e1e;
+    border: none;
+}
+
+QTreeWidget::item:selected {
+    background-color: #c4e1ff;
+}
+
+QPlainTextEdit {
+    background-color: #ffffff;
+    color: #1e1e1e;
+    selection-background-color: #add6ff;
+    border: none;
+}
+
+QStatusBar {
+    background-color: #007acc;
+    color: #ffffff;
+}
+
+QSplitter::handle {
+    background-color: #e0e0e0;
+}
+
+QPushButton {
+    background-color: #0e639c;
+    color: #ffffff;
+    border: none;
+    padding: 4px 12px;
+}
+
+QPushButton:hover {
+    background-color: #1177bb;
+}
+
+QScrollBar:vertical {
+    background-color: #f3f3f3;
+    width: 12px;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #c1c1c1;
+    min-height: 20px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: #a0a0a0;
+}
