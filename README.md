@@ -21,10 +21,13 @@ CodeRunner is built to be the tool you unzip and start coding in.
 ### Core
 
 - Syntax-highlighted code editor with line numbers and dark theme
+- Create, open, save, and close files with starter templates (C, C++, headers)
+- Undo / redo / cut / copy / paste / select all
 - Single-file and multi-file project compilation
 - Color-coded compiler output with click-to-navigate errors
 - Run compiled binaries with interactive I/O
-- Project file tree with open/browse support
+- Project file tree with create / rename / delete (disk-level operations)
+- Build scripts for quick launch (`./build.sh run` / `build.bat run`)
 
 ### Compiler Integration
 
@@ -100,6 +103,8 @@ CodeRunner/
 │   └── hello.c
 ├── docs/                         # Development roadmap and phase details
 ├── CMakeLists.txt
+├── build.sh                      # Linux/macOS build script
+├── build.bat                     # Windows build script
 ├── INSTALLATION.md
 └── LICENSE                       # MPL-2.0
 ```
@@ -111,7 +116,8 @@ CodeRunner/
 | Core foundation (editor, menus, file tree) | Done |
 | Compiler integration (detect, build, error parsing) | Done |
 | Debug mode (GDB, breakpoints, stepping) | Done |
-| File manager (new/rename/delete, templates, recent projects) | In progress |
+| MVP wiring (save, edit menu, build scripts, icons) | Done |
+| File manager (new/rename/delete, templates, recent projects) | ~65% done |
 | UI polish (themes, fonts, layout customization) | Planned |
 | Advanced features (code completion, find/replace, git) | Planned |
 | Testing and cross-platform verification | Planned |

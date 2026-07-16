@@ -68,49 +68,37 @@
 
 ---
 
-## Phase 4: File Manager Enhancement 📁 (Current)
+## Phase 4: File Manager Enhancement 📁 (~65% Complete)
 **Goal**: Full project management
 
 ### Deliverables:
-- [ ] Create new file/folder
-- [ ] Delete file/folder
-- [ ] Rename operations
-- [ ] Project templates (C, C++, Hello World)
-- [ ] Recent projects
-- [ ] Project settings dialog
+- [x] Create new file/folder (FileManager + MainWindow new file/project dialogs)
+- [x] Delete file/folder (recursive, with signals)
+- [x] Rename operations (disk-level QFile::rename + UI update)
+- [x] Project settings dialog (CompilerSettingsDialog wired to ProjectConfig, saves to coderunner.json)
+- [ ] Project templates — selection dialog on new project (inline templates exist for .c/.cpp/.h, but no chooser UI)
+- [ ] Recent projects — MRU list in File menu via QSettings
 
 ### Features:
 - Drag & drop file organization
 - .gitignore support
 - Project metadata (compiler flags, optimization)
 
-### Implementation Plan:
-1. **FileManager Enhancement**
-   - Add context menu to file tree
-   - Implement file/folder creation dialogs
-   - Add delete confirmation dialog
-   - Add inline rename functionality
+### Remaining Work:
+1. **Recent Projects**
+   - Store recent project paths in QSettings
+   - Add "Recent Projects" submenu under File
+   - Load on click
 
-2. **Project Templates**
-   - Create template files for C, C++, Hello World projects
-   - Add template selection dialog on new project
-   - Auto-populate template content
+2. **Project Template Selection Dialog**
+   - Prompt on New Project (Empty, C Hello World, C++ Hello World, Competitive Programming)
+   - Copy from `templates/` directory into new project
 
-3. **Recent Projects**
-   - Store recent project paths in settings
-   - Add "Recent Projects" menu
-   - Implement MRU (Most Recently Used) list
-
-4. **Project Settings Dialog**
-   - Display .coderunner configuration
-   - Allow editing compiler flags
-   - Save optimization levels
-   - Support custom build commands
-
-5. **Advanced File Operations**
+3. **Advanced File Operations**
+   - Wire context menu actions to FileManager methods
    - Implement drag & drop in file tree
+   - Add delete confirmation dialog
    - Add .gitignore creation/editing
-   - Store project metadata
 
 ---
 
@@ -196,7 +184,7 @@
 | Phase 1 (Foundation) | 1-2 weeks | ✅ Complete |
 | Phase 2 (Compiler) | 1-2 weeks | ✅ Complete |
 | Phase 3 (Debug) | 2-3 weeks | ✅ Complete |
-| Phase 4 (File Manager) | 1 week | 🔄 In Progress |
+| Phase 4 (File Manager) | 1 week | 🔄 ~65% Complete |
 | Phase 5 (UI/Themes) | 1-2 weeks | 📅 Planned |
 | Phase 6 (Advanced) | 2-3 weeks | 📅 Planned |
 | Phase 7 (Testing) | 1-2 weeks | 📅 Planned |
